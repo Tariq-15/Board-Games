@@ -1,227 +1,173 @@
-const { getDatabase } = require('../config/database');
+const mongoose = require('mongoose');
 
-class Game {
-  constructor(data) {
-    this.name = data.name;
-    this.description = data.description;
-    this.category = data.category;
-    this.minPlayers = data.minPlayers;
-    this.maxPlayers = data.maxPlayers;
-    this.averagePlayTime = data.averagePlayTime;
-    this.difficulty = data.difficulty || 'Medium';
-    this.ageRange = data.ageRange;
-    this.images = data.images || [];
-    this.videoUrl = data.videoUrl;
-    this.tutorialUrl = data.tutorialUrl;
-    this.components = data.components || [];
-    this.price = data.price;
-    this.publisher = data.publisher;
-    this.releaseYear = data.releaseYear;
-    this.averageRating = data.averageRating || 0;
-    this.totalRatings = data.totalRatings || 0;
-    this.isActive = data.isActive !== undefined ? data.isActive : true;
-    this.createdAt = data.createdAt || new Date();
-    this.updatedAt = data.updatedAt || new Date();
+const gameSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: [true, 'Game name is required'],
+    trim: true,
+    maxlength: [100, 'Game name cannot exceed 100 characters']
+  },
+  description: {
+    type: String,
+    required: [true, 'Game description is required'],
+    maxlength: [2000, 'Description cannot exceed 2000 characters']
+  },
+  category: {
+    type: String,
+    required: [true, 'Game category is required'],
+    enum: ['Strategy', 'Family', 'Party', 'Adventure', 'Puzzle', 'Educational', 'Other'],
+    default: 'Other'
+  },
+  minPlayers: {
+    type: Number,
+    required: [true, 'Minimum players is required'],
+    min: [1, 'Minimum players must be at least 1'],
+    max: [20, 'Maximum players cannot exceed 20']
+  },
+  maxPlayers: {
+    type: Number,
+    required: [true, 'Maximum players is required'],
+    min: [1, 'Maximum players must be at least 1'],
+    max: [20, 'Maximum players cannot exceed 20']
+  },
+  averagePlayTime: {
+    type: Number,
+    required: [true, 'Average play time is required'],
+    min: [5, 'Play time must be at least 5 minutes'],
+    max: [480, 'Play time cannot exceed 8 hours']
+  },
+  difficulty: {
+    type: String,
+    enum: ['Easy', 'Medium', 'Hard', 'Expert'],
+    default: 'Medium'
+  },
+  ageRange: {
+    min: {
+      type: Number,
+      required: [true, 'Minimum age is required'],
+      min: [0, 'Minimum age must be at least 0'],
+      max: [18, 'Minimum age cannot exceed 18']
+    },
+    max: {
+      type: Number,
+      required: [true, 'Maximum age is required'],
+      min: [0, 'Maximum age must be at least 0'],
+      max: [99, 'Maximum age cannot exceed 99']
+    }
+  },
+  images: [{
+    type: String,
+    validate: {
+      validator: function(v) {
+        return /^https?:\/\/.+/.test(v) || /^\/uploads\/.+/.test(v);
+      },
+      message: 'Image must be a valid URL or file path'
+    }
+  }],
+  videoUrl: {
+    type: String,
+    validate: {
+      validator: function(v) {
+        if (!v) return true; // Optional field
+        return /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\/.+/.test(v);
+      },
+      message: 'Video URL must be a valid YouTube URL'
+    }
+  },
+  tutorialUrl: {
+    type: String,
+    validate: {
+      validator: function(v) {
+        if (!v) return true; // Optional field
+        return /^https?:\/.+/.test(v);
+      },
+      message: 'Tutorial URL must be a valid URL'
+    }
+  },
+  components: [{
+    name: {
+      type: String,
+      required: [true, 'Component name is required']
+    },
+    quantity: {
+      type: Number,
+      required: [true, 'Component quantity is required'],
+      min: [1, 'Quantity must be at least 1']
+    },
+    description: {
+      type: String,
+      maxlength: [200, 'Component description cannot exceed 200 characters']
+    }
+  }],
+  price: {
+    type: Number,
+    min: [0, 'Price cannot be negative'],
+    max: [1000, 'Price cannot exceed $1000']
+  },
+  publisher: {
+    type: String,
+    trim: true,
+    maxlength: [100, 'Publisher name cannot exceed 100 characters']
+  },
+  releaseYear: {
+    type: Number,
+    min: [1900, 'Release year must be at least 1900'],
+    max: [new Date().getFullYear() + 1, 'Release year cannot be in the future']
+  },
+  averageRating: {
+    type: Number,
+    default: 0,
+    min: [0, 'Rating cannot be negative'],
+    max: [5, 'Rating cannot exceed 5']
+  },
+  totalRatings: {
+    type: Number,
+    default: 0,
+    min: [0, 'Total ratings cannot be negative']
+  },
+  isActive: {
+    type: Boolean,
+    default: true
   }
+}, {
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
+});
 
-  // Validation methods
-  validate() {
-    const errors = [];
-
-    if (!this.name || this.name.trim().length === 0) {
-      errors.push('Game name is required');
-    } else if (this.name.length > 100) {
-      errors.push('Game name cannot exceed 100 characters');
-    }
-
-    if (!this.description || this.description.trim().length === 0) {
-      errors.push('Game description is required');
-    } else if (this.description.length > 2000) {
-      errors.push('Description cannot exceed 2000 characters');
-    }
-
-    const validCategories = ['Strategy', 'Family', 'Party', 'Adventure', 'Puzzle', 'Educational', 'Other'];
-    if (!this.category || !validCategories.includes(this.category)) {
-      errors.push('Game category is required and must be valid');
-    }
-
-    if (!this.minPlayers || this.minPlayers < 1 || this.minPlayers > 20) {
-      errors.push('Minimum players must be between 1 and 20');
-    }
-
-    if (!this.maxPlayers || this.maxPlayers < 1 || this.maxPlayers > 20) {
-      errors.push('Maximum players must be between 1 and 20');
-    }
-
-    if (this.minPlayers > this.maxPlayers) {
-      errors.push('Minimum players cannot be greater than maximum players');
-    }
-
-    if (!this.averagePlayTime || this.averagePlayTime < 5 || this.averagePlayTime > 480) {
-      errors.push('Average play time must be between 5 and 480 minutes');
-    }
-
-    const validDifficulties = ['Easy', 'Medium', 'Hard', 'Expert'];
-    if (this.difficulty && !validDifficulties.includes(this.difficulty)) {
-      errors.push('Difficulty must be valid');
-    }
-
-    if (!this.ageRange || !this.ageRange.min || !this.ageRange.max) {
-      errors.push('Age range is required');
-    } else {
-      if (this.ageRange.min < 0 || this.ageRange.min > 18) {
-        errors.push('Minimum age must be between 0 and 18');
-      }
-      if (this.ageRange.max < 0 || this.ageRange.max > 99) {
-        errors.push('Maximum age must be between 0 and 99');
-      }
-      if (this.ageRange.min > this.ageRange.max) {
-        errors.push('Minimum age cannot be greater than maximum age');
-      }
-    }
-
-    if (this.price !== undefined && (this.price < 0 || this.price > 1000)) {
-      errors.push('Price must be between 0 and 1000');
-    }
-
-    if (this.releaseYear && (this.releaseYear < 1900 || this.releaseYear > new Date().getFullYear() + 1)) {
-      errors.push('Release year must be valid');
-    }
-
-    if (this.averageRating < 0 || this.averageRating > 5) {
-      errors.push('Average rating must be between 0 and 5');
-    }
-
-    if (this.totalRatings < 0) {
-      errors.push('Total ratings cannot be negative');
-    }
-
-    return errors;
+// Virtual for player range
+gameSchema.virtual('playerRange').get(function() {
+  if (this.minPlayers === this.maxPlayers) {
+    return `${this.minPlayers} player`;
   }
+  return `${this.minPlayers}-${this.maxPlayers} players`;
+});
 
-  // Static methods for database operations
-  static async create(gameData) {
-    const game = new Game(gameData);
-    const errors = game.validate();
-    
-    if (errors.length > 0) {
-      throw new Error(errors.join(', '));
-    }
-
-    const db = getDatabase();
-    const result = await db.collection('games').insertOne(game);
-    return { ...game, _id: result.insertedId };
+// Virtual for age range
+gameSchema.virtual('ageRangeText').get(function() {
+  if (this.ageRange.min === this.ageRange.max) {
+    return `${this.ageRange.min}+`;
   }
+  return `${this.ageRange.min}-${this.ageRange.max}`;
+});
 
-  static async findById(id) {
-    const db = getDatabase();
-    const game = await db.collection('games').findOne({ _id: id });
-    return game ? new Game(game) : null;
+// Index for search functionality
+gameSchema.index({ 
+  name: 'text', 
+  description: 'text', 
+  category: 'text',
+  publisher: 'text'
+});
+
+// Pre-save middleware to validate player counts
+gameSchema.pre('save', function(next) {
+  if (this.minPlayers > this.maxPlayers) {
+    next(new Error('Minimum players cannot be greater than maximum players'));
   }
-
-  static async findByIdString(id) {
-    const db = getDatabase();
-    const { ObjectId } = require('mongodb');
-    
-    try {
-      const objectId = new ObjectId(id);
-      const game = await db.collection('games').findOne({ _id: objectId });
-      return game ? new Game(game) : null;
-    } catch (error) {
-      return null;
-    }
+  if (this.ageRange.min > this.ageRange.max) {
+    next(new Error('Minimum age cannot be greater than maximum age'));
   }
+  next();
+});
 
-  static async findAll(query = {}, sort = {}) {
-    const db = getDatabase();
-    const games = await db.collection('games').find(query).sort(sort).toArray();
-    return games.map(game => new Game(game));
-  }
-
-  static async findActive(query = {}) {
-    const db = getDatabase();
-    const games = await db.collection('games').find({ ...query, isActive: true }).toArray();
-    return games.map(game => new Game(game));
-  }
-
-  static async search(text) {
-    const db = getDatabase();
-    const games = await db.collection('games').find({
-      $text: { $search: text },
-      isActive: true
-    }).toArray();
-    return games.map(game => new Game(game));
-  }
-
-  static async updateById(id, updateData) {
-    const db = getDatabase();
-    const { ObjectId } = require('mongodb');
-    
-    try {
-      const objectId = new ObjectId(id);
-      const game = new Game({ ...updateData, updatedAt: new Date() });
-      const errors = game.validate();
-      
-      if (errors.length > 0) {
-        throw new Error(errors.join(', '));
-      }
-
-      const result = await db.collection('games').updateOne(
-        { _id: objectId },
-        { $set: updateData }
-      );
-      
-      return result.modifiedCount > 0;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  static async deleteById(id) {
-    const db = getDatabase();
-    const { ObjectId } = require('mongodb');
-    
-    try {
-      const objectId = new ObjectId(id);
-      const result = await db.collection('games').deleteOne({ _id: objectId });
-      return result.deletedCount > 0;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  static async softDeleteById(id) {
-    return await this.updateById(id, { isActive: false });
-  }
-
-  // Instance methods
-  async save() {
-    if (this._id) {
-      // Update existing game
-      const result = await Game.updateById(this._id, this);
-      return result;
-    } else {
-      // Create new game
-      const newGame = await Game.create(this);
-      this._id = newGame._id;
-      return newGame;
-    }
-  }
-
-  // Virtual properties (computed)
-  get playerRange() {
-    if (this.minPlayers === this.maxPlayers) {
-      return `${this.minPlayers} player`;
-    }
-    return `${this.minPlayers}-${this.maxPlayers} players`;
-  }
-
-  get ageRangeText() {
-    if (this.ageRange.min === this.ageRange.max) {
-      return `${this.ageRange.min}+`;
-    }
-    return `${this.ageRange.min}-${this.ageRange.max}`;
-  }
-}
-
-module.exports = Game; 
+module.exports = mongoose.model('Game', gameSchema);
