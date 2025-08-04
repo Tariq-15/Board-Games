@@ -1,5 +1,4 @@
 const Game = require('../models/Game');
-const { getDatabase } = require('../config/database');
 
 // Get all games with search and filter functionality
 const getAllGames = async (req, res) => {
@@ -61,17 +60,15 @@ const getAllGames = async (req, res) => {
     // Pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // Execute query using native MongoDB driver
-    const db = getDatabase();
-    const games = await db.collection('games')
-      .find(filter)
+    // Execute query
+    const games = await Game.find(filter)
       .sort(sort)
       .skip(skip)
       .limit(parseInt(limit))
-      .toArray();
+      .select('-__v');
 
     // Get total count for pagination
-    const total = await db.collection('games').countDocuments(filter);
+    const total = await Game.countDocuments(filter);
 
     res.status(200).json({
       success: true,
@@ -98,7 +95,7 @@ const getGameById = async (req, res) => {
   try {
     const { id } = req.params;
     
-    const game = await Game.findByIdString(id);
+    const game = await Game.findById(id).select('-__v');
     
     if (!game) {
       return res.status(404).json({
@@ -137,7 +134,8 @@ const createGame = async (req, res) => {
       }
     }
 
-    const game = await Game.create(gameData);
+    const game = new Game(gameData);
+    await game.save();
 
     res.status(201).json({
       success: true,
@@ -160,22 +158,23 @@ const updateGame = async (req, res) => {
     const { id } = req.params;
     const updateData = req.body;
 
-    const success = await Game.updateById(id, updateData);
+    const game = await Game.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true, runValidators: true }
+    ).select('-__v');
 
-    if (!success) {
+    if (!game) {
       return res.status(404).json({
         success: false,
         message: 'Game not found'
       });
     }
 
-    // Get updated game
-    const updatedGame = await Game.findByIdString(id);
-
     res.status(200).json({
       success: true,
       message: 'Game updated successfully',
-      data: updatedGame
+      data: game
     });
   } catch (error) {
     console.error('Error updating game:', error);
@@ -192,9 +191,13 @@ const deleteGame = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const success = await Game.softDeleteById(id);
+    const game = await Game.findByIdAndUpdate(
+      id,
+      { isActive: false },
+      { new: true }
+    );
 
-    if (!success) {
+    if (!game) {
       return res.status(404).json({
         success: false,
         message: 'Game not found'
@@ -218,8 +221,7 @@ const deleteGame = async (req, res) => {
 // Get game categories for filter options
 const getGameCategories = async (req, res) => {
   try {
-    const db = getDatabase();
-    const categories = await db.collection('games').distinct('category');
+    const categories = await Game.distinct('category');
     
     res.status(200).json({
       success: true,
@@ -238,15 +240,13 @@ const getGameCategories = async (req, res) => {
 // Get filter options
 const getFilterOptions = async (req, res) => {
   try {
-    const db = getDatabase();
-    
     const [categories, difficulties] = await Promise.all([
-      db.collection('games').distinct('category'),
-      db.collection('games').distinct('difficulty')
+      Game.distinct('category'),
+      Game.distinct('difficulty')
     ]);
 
     // Get min/max values for numeric filters
-    const stats = await db.collection('games').aggregate([
+    const stats = await Game.aggregate([
       { $match: { isActive: true } },
       {
         $group: {
@@ -257,7 +257,7 @@ const getFilterOptions = async (req, res) => {
           maxPlayTime: { $max: '$averagePlayTime' }
         }
       }
-    ]).toArray();
+    ]);
 
     res.status(200).json({
       success: true,
@@ -292,4 +292,4 @@ module.exports = {
   deleteGame,
   getGameCategories,
   getFilterOptions
-}; 
+};
