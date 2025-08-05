@@ -1,0 +1,21 @@
+<!-- Review Card Template -->
+<div class="review-card">
+    <div class="review-header">
+        <div class="review-user">
+            <div class="review-avatar">
+                {{review.userInitial}}
+            </div>
+            <div class="review-info">
+                <h4>{{review.userName}}</h4>
+                <span class="review-date">{{review.formattedDate}}</span>
+            </div>
+        </div>
+        <div class="review-rating">
+            {{review.starRating}}
+        </div>
+    </div>
+    <p class="review-comment">{{review.truncatedComment}}</p>
+    <div class="review-game">
+        Review for: <a href="pages/game-detail.html?id={{review.gameId}}">{{review.gameName}}</a>
+    </div>
+</div> 

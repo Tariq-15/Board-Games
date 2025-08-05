@@ -1,0 +1,17 @@
+<!-- Game Card Template -->
+<div class="game-card" data-game-id="{{game.id}}">
+    <img src="{{game.image}}" alt="{{game.name}}" class="game-card-image" 
+         onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjNmM3NTdkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxOCIgZmlsbD0iI2ZmZmZmZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkdhbWUgSW1hZ2U8L3RleHQ+PC9zdmc+'">
+    <div class="game-card-content">
+        <div class="game-card-category">{{game.category}}</div>
+        <h3 class="game-card-title">{{game.name}}</h3>
+        <p class="game-card-description">{{game.description}}</p>
+        <div class="game-card-meta">
+            <span>{{game.playerRange}} • {{game.formattedPlaytime}}</span>
+            <div class="game-card-rating">
+                {{game.starRating}}
+                <span>{{game.rating}}</span>
+            </div>
+        </div>
+    </div>
+</div> 
