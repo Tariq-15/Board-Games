@@ -1,0 +1,265 @@
+import { supabase } from '@/lib/supabase/client'
+import type { GameFilters } from '@/controllers/GameController'
+
+export interface Game {
+  id: string
+  title: string
+  description: string
+  short_description: string
+  publisher: string
+  designer: string
+  year_published: number
+  min_players: number
+  max_players: number
+  min_age: number
+  playing_time: number
+  complexity_rating: number
+  price: number
+  image_url: string
+  thumbnail_url: string
+  category_id: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  // Computed fields
+  category_name?: string
+  average_rating?: number
+  review_count?: number
+}
+
+export class GameModel {
+  private static instance: GameModel
+
+  private constructor() {}
+
+  public static getInstance(): GameModel {
+    if (!GameModel.instance) {
+      GameModel.instance = new GameModel()
+    }
+    return GameModel.instance
+  }
+
+  // CRUD Operations
+  public async findAll(): Promise<Game[]> {
+    const { data, error } = await supabase
+      .from('games')
+      .select(`
+        *,
+        categories(name)
+      `)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('Error fetching games:', error)
+      return []
+    }
+
+    // Get average ratings and review counts for all games
+    const gameIds = data?.map(game => game.id) || []
+    let ratingsData: any[] = []
+    
+    if (gameIds.length > 0) {
+      const { data: ratings, error: ratingsError } = await supabase
+        .from('reviews')
+        .select('game_id, rating')
+        .in('game_id', gameIds)
+      
+      if (!ratingsError && ratings) {
+        ratingsData = ratings
+      }
+    }
+
+    return data?.map(game => {
+      const gameReviews = ratingsData.filter(r => r.game_id === game.id)
+      const averageRating = gameReviews.length > 0 
+        ? gameReviews.reduce((sum, r) => sum + r.rating, 0) / gameReviews.length 
+        : 0
+      
+      return {
+        ...game,
+        category_name: game.categories?.name,
+        average_rating: Number(averageRating.toFixed(1)),
+        review_count: gameReviews.length
+      }
+    }) || []
+  }
+
+  public async findById(id: string): Promise<Game | null> {
+    const { data, error } = await supabase
+      .from('games')
+      .select(`
+        *,
+        categories(name)
+      `)
+      .eq('id', id)
+      .eq('is_active', true)
+      .single()
+
+    if (error) {
+      console.error('Error fetching game:', error)
+      return null
+    }
+
+    return data ? {
+      ...data,
+      category_name: data.categories?.name
+    } : null
+  }
+
+  public async findFeatured(): Promise<Game[]> {
+    const { data, error } = await supabase
+      .from('games')
+      .select(`
+        *,
+        categories(name)
+      `)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(6)
+
+    if (error) {
+      console.error('Error fetching featured games:', error)
+      return []
+    }
+
+    return data?.map(game => ({
+      ...game,
+      category_name: game.categories?.name
+    })) || []
+  }
+
+  public async search(query: string): Promise<Game[]> {
+    const { data, error } = await supabase
+      .from('games')
+      .select(`
+        *,
+        categories(name)
+      `)
+      .eq('is_active', true)
+      .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
+      .order('title', { ascending: true })
+
+    if (error) {
+      console.error('Error searching games:', error)
+      return []
+    }
+
+    return data?.map(game => ({
+      ...game,
+      category_name: game.categories?.name
+    })) || []
+  }
+
+  public async findWithFilters(filters: GameFilters = {}): Promise<Game[]> {
+    let query = supabase
+      .from('games')
+      .select(`
+        *,
+        categories(name)
+      `)
+      .eq('is_active', true)
+
+    if (filters.search && filters.search.trim()) {
+      query = query.or(`title.ilike.%${filters.search.trim()}%,description.ilike.%${filters.search.trim()}%`)
+    }
+
+    if (filters.category && filters.category !== "all-categories" && filters.category.trim()) {
+      query = query.eq('category_id', filters.category)
+    }
+
+    if (filters.players && filters.players !== "any-number" && filters.players.trim()) {
+      const playerCount = filters.players === "5+" ? 5 : Number.parseInt(filters.players)
+      if (!isNaN(playerCount)) {
+        query = query.gte('min_players', playerCount).lte('max_players', playerCount)
+      }
+    }
+
+    if (filters.playtime && filters.playtime.trim()) {
+      const maxPlaytime = Number.parseInt(filters.playtime)
+      if (!isNaN(maxPlaytime)) {
+        query = query.lte('playing_time', maxPlaytime)
+      }
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('Error fetching games with filters:', error)
+      return []
+    }
+
+    return data?.map(game => ({
+      ...game,
+      category_name: game.categories?.name
+    })) || []
+  }
+
+  public async findSimilar(currentGame: Game): Promise<Game[]> {
+    const { data, error } = await supabase
+      .from('games')
+      .select(`
+        *,
+        categories(name)
+      `)
+      .eq('is_active', true)
+      .eq('category_id', currentGame.category_id)
+      .neq('id', currentGame.id)
+      .limit(3)
+
+    if (error) {
+      console.error('Error fetching similar games:', error)
+      return []
+    }
+
+    return data?.map(game => ({
+      ...game,
+      category_name: game.categories?.name
+    })) || []
+  }
+
+  public async create(gameData: Omit<Game, 'id' | 'created_at' | 'updated_at'>): Promise<Game> {
+    const { data, error } = await supabase
+      .from('games')
+      .insert([gameData])
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error creating game:', error)
+      throw new Error('Failed to create game')
+    }
+
+    return data
+  }
+
+  public async update(id: string, gameData: Partial<Game>): Promise<Game> {
+    const { data, error } = await supabase
+      .from('games')
+      .update({ ...gameData, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Error updating game:', error)
+      throw new Error('Failed to update game')
+    }
+
+    return data
+  }
+
+  public async delete(id: string): Promise<boolean> {
+    const { error } = await supabase
+      .from('games')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      console.error('Error deleting game:', error)
+      return false
+    }
+
+    return true
+  }
+}
