@@ -1,7 +1,8 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -10,26 +11,33 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import type { Game } from "@/Model/Game"
-
-const categories = [
-  "Strategy",
-  "Family",
-  "Party",
-  "Cooperative",
-  "Deck Building",
-  "Worker Placement",
-  "Area Control",
-  "Abstract",
-  "Thematic",
-]
+import type { Category } from "@/Model/Category"
+import { CategoryModel } from "@/Model/Category"
 
 interface GameFormProps {
   game?: Game
   onSubmit?: (gameData: Partial<Game>) => void
+  isUpdating?: boolean
 }
 
-export function GameForm({ game, onSubmit }: GameFormProps) {
+export function GameForm({ game, onSubmit, isUpdating = false }: GameFormProps) {
+  const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [categories, setCategories] = useState<Category[]>([])
+
+  // Load categories on component mount
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const categoryModel = CategoryModel.getInstance()
+        const categoriesData = await categoryModel.findAll()
+        setCategories(categoriesData)
+      } catch (error) {
+        console.error("Error loading categories:", error)
+      }
+    }
+    loadCategories()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -55,7 +63,6 @@ export function GameForm({ game, onSubmit }: GameFormProps) {
       is_active: formData.get("is_active") === "on",
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 1000))
     onSubmit?.(gameData)
     setLoading(false)
   }
@@ -103,8 +110,8 @@ export function GameForm({ game, onSubmit }: GameFormProps) {
                 </SelectTrigger>
                 <SelectContent>
                   {categories.map((category) => (
-                    <SelectItem key={category} value={category.toLowerCase().replace(/\s+/g, '_')}>
-                      {category}
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -250,11 +257,16 @@ export function GameForm({ game, onSubmit }: GameFormProps) {
       </div>
 
       <div className="flex justify-end space-x-4">
-        <Button type="button" variant="outline">
+        <Button 
+          type="button" 
+          variant="outline" 
+          disabled={loading || isUpdating}
+          onClick={() => router.push("/admin/games")}
+        >
           Cancel
         </Button>
-        <Button type="submit" disabled={loading}>
-          {loading ? "Saving..." : "Save Changes"}
+        <Button type="submit" disabled={loading || isUpdating}>
+          {loading || isUpdating ? "Saving..." : "Save Changes"}
         </Button>
       </div>
     </form>

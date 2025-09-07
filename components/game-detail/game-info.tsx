@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import type { Game } from "@/lib/data/games"
+import type { Game } from "@/Model/Game"
 
 interface GameInfoProps {
   game: Game
@@ -21,12 +21,12 @@ export function GameInfo({ game }: GameInfoProps) {
           <div>
             <h4 className="font-medium mb-1">Players</h4>
             <p className="text-muted-foreground">
-              {game.minPlayers}-{game.maxPlayers}
+              {game.min_players}-{game.max_players}
             </p>
           </div>
           <div>
             <h4 className="font-medium mb-1">Play Time</h4>
-            <p className="text-muted-foreground">{game.playtime} minutes</p>
+            <p className="text-muted-foreground">{game.playing_time} minutes</p>
           </div>
           <div>
             <h4 className="font-medium mb-1">Category</h4>
@@ -35,7 +35,7 @@ export function GameInfo({ game }: GameInfoProps) {
           <div>
             <h4 className="font-medium mb-1">Rating</h4>
             <p className="text-muted-foreground">
-              {game.rating}/5 ({game.reviewCount} reviews)
+              {game.average_rating ? `${game.average_rating}/5` : 'N/A'} ({game.review_count || 0} reviews)
             </p>
           </div>
         </div>

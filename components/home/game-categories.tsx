@@ -6,16 +6,24 @@ import { CategoryService } from "@/lib/services/CategoryService"
 
 export async function GameCategories() {
   const categoryService = new CategoryService()
-  const categories = await categoryService.getCategories()
-  const featuredCategories = categories.filter((cat) => cat.featured).slice(0, 6)
+  const featuredCategories = await categoryService.getFeaturedCategories()
 
   const iconMap = {
-    Puzzle,
-    Heart,
-    Users,
-    Gamepad2,
-    Zap,
-    Trophy,
+    'Strategy': Trophy,
+    'Family': Heart,
+    'Party': Users,
+    'Adventure': Gamepad2,
+    'Puzzle': Puzzle,
+    'Educational': Zap,
+  }
+
+  const colorMap = {
+    'Strategy': 'bg-blue-500',
+    'Family': 'bg-green-500',
+    'Party': 'bg-purple-500',
+    'Adventure': 'bg-orange-500',
+    'Puzzle': 'bg-yellow-500',
+    'Educational': 'bg-red-500',
   }
 
   return (
@@ -27,18 +35,19 @@ export async function GameCategories() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {featuredCategories.map((category) => {
-          const IconComponent = iconMap[category.icon as keyof typeof iconMap] || Puzzle
+          const IconComponent = iconMap[category.name as keyof typeof iconMap] || Puzzle
+          const colorClass = colorMap[category.name as keyof typeof colorMap] || 'bg-gray-500'
           return (
             <Link key={category.id} href={`/games?category=${category.name.toLowerCase()}`}>
               <Card className="hover:shadow-lg transition-shadow">
                 <CardHeader>
                   <div className="flex items-center space-x-3">
-                    <div className={`p-2 rounded-lg ${category.color}`}>
+                    <div className={`p-2 rounded-lg ${colorClass}`}>
                       <IconComponent className="w-6 h-6 text-white" />
                     </div>
                     <div>
                       <CardTitle className="text-lg">{category.name}</CardTitle>
-                      <Badge variant="secondary">{category.count} games</Badge>
+                      <Badge variant="secondary">{category.game_count || 0} games</Badge>
                     </div>
                   </div>
                 </CardHeader>

@@ -1,4 +1,6 @@
 import type { User } from "@/Model/User"
+import { UserModel } from "@/Model/User"
+import { supabase } from "@/lib/supabase/client"
 
 export interface UserFilters {
   status?: string
@@ -14,70 +16,86 @@ export interface PaginatedUsers {
 }
 
 export class UserService {
+  private userModel: UserModel
+
+  constructor() {
+    this.userModel = UserModel.getInstance()
+  }
+
   public async getAllUsers(searchParams: UserFilters = {}): Promise<PaginatedUsers> {
-    // Mock data for now - replace with actual database calls later
-    const mockUsers: User[] = [
-      {
-        id: "1",
-        email: "john@example.com",
-        full_name: "John Doe",
-        avatar_url: "/placeholder-user.jpg",
-        bio: "Board game enthusiast",
-        created_at: "2024-01-15T00:00:00Z",
-        updated_at: "2024-01-15T00:00:00Z",
-        review_count: 5,
-        role: "user"
-      },
-      {
-        id: "2",
-        email: "jane@example.com",
-        full_name: "Jane Smith",
-        avatar_url: "/placeholder-user.jpg",
-        bio: "Game master",
-        created_at: "2024-01-10T00:00:00Z",
-        updated_at: "2024-01-10T00:00:00Z",
-        review_count: 12,
-        role: "admin"
-      },
-      {
-        id: "3",
-        email: "bob@example.com",
-        full_name: "Bob Johnson",
-        avatar_url: "/placeholder-user.jpg",
-        bio: "Casual player",
-        created_at: "2024-01-05T00:00:00Z",
-        updated_at: "2024-01-05T00:00:00Z",
-        review_count: 3,
-        role: "user"
+    try {
+      // Get users from database with filters
+      const filters = {
+        search: searchParams.search,
+        status: searchParams.status
       }
-    ]
+      
+      const users = await this.userModel.findAll(filters)
+      
+      // Get review counts for each user
+      const usersWithReviewCounts = await Promise.all(
+        users.map(async (user) => {
+          const { count } = await supabase
+            .from('reviews')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+            .eq('status', 'approved')
+          
+          return {
+            ...user,
+            review_count: count || 0,
+            role: 'user' // Default role, can be enhanced later with admin roles
+          }
+        })
+      )
 
-    const page = Number.parseInt(searchParams.page || "1")
-    const pageSize = 10
-    const totalPages = Math.ceil(mockUsers.length / pageSize)
-    const startIndex = (page - 1) * pageSize
-    const paginatedUsers = mockUsers.slice(startIndex, startIndex + pageSize)
+      const page = Number.parseInt(searchParams.page || "1")
+      const pageSize = 10
+      const totalPages = Math.ceil(usersWithReviewCounts.length / pageSize)
+      const startIndex = (page - 1) * pageSize
+      const paginatedUsers = usersWithReviewCounts.slice(startIndex, startIndex + pageSize)
 
-    return {
-      users: paginatedUsers,
-      totalPages,
-      currentPage: page,
-      totalCount: mockUsers.length,
+      return {
+        users: paginatedUsers,
+        totalPages,
+        currentPage: page,
+        totalCount: usersWithReviewCounts.length,
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error)
+      return {
+        users: [],
+        totalPages: 0,
+        currentPage: 1,
+        totalCount: 0,
+      }
     }
   }
 
   public async getUserById(id: string): Promise<User | null> {
-    // Mock implementation
-    return null
+    try {
+      return await this.userModel.findById(id)
+    } catch (error) {
+      console.error('Error fetching user by ID:', error)
+      return null
+    }
   }
 
   public async updateUser(id: string, userData: Partial<User>): Promise<User> {
-    // Mock implementation
-    throw new Error("Not implemented")
+    try {
+      return await this.userModel.update(id, userData)
+    } catch (error) {
+      console.error('Error updating user:', error)
+      throw new Error("Failed to update user")
+    }
   }
 
   public async deleteUser(id: string): Promise<boolean> {
-    // Mock implementation
-    return false
+    try {
+      return await this.userModel.delete(id)
+    } catch (error) {
+      console.error('Error deleting user:', error)
+      return false
+    }
   }
 }

@@ -1,7 +1,8 @@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Star, Users, Clock, Heart } from "lucide-react"
+import { Star, Users, Clock } from "lucide-react"
 import { GameImage } from "@/components/ui/game-image"
+import { WishlistButton } from "@/components/ui/wishlist-button"
 import type { Game } from "@/Model/Game"
 
 interface GameHeaderProps {
@@ -47,10 +48,12 @@ export function GameHeader({ game }: GameHeaderProps) {
         </div>
 
         <div className="flex space-x-4">
-          <Button size="lg" className="flex-1">
-            Add to Wishlist
-            <Heart className="w-4 h-4 ml-2" />
-          </Button>
+          <WishlistButton 
+            gameId={game.id} 
+            gameTitle={game.title}
+            size="lg"
+            className="flex-1"
+          />
           <Button size="lg" variant="outline" className="flex-1 bg-transparent">
             Share Game
           </Button>

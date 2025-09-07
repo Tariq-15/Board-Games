@@ -11,8 +11,8 @@ const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "Board Game Marketplace",
-  description: "Discover, review, and explore board games",
-    generator: 'v0.app'
+  description: "Discover, review, and explore the board games",
+    generator: 'Tariq'
 }
 
 export default function RootLayout({

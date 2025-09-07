@@ -28,25 +28,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsClient(true)
   }, [])
 
-  // Memoize the auth check function
-  const checkAuth = useCallback(async () => {
-    try {
-      const { user: currentUser, error } = await authService.getCurrentUser()
-      if (currentUser && !error) {
-        setUser(currentUser)
-      }
-    } catch (error) {
-      console.error('Auth check error:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
   useEffect(() => {
     if (!isClient) return
 
-    // Check if user is already logged in
-    checkAuth()
+    // Set loading to false immediately to prevent infinite loading
+    setLoading(false)
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -62,14 +48,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         } catch (error) {
           console.error('Auth state change error:', error)
-        } finally {
-          setLoading(false)
         }
       }
     )
 
+    // Check current session after setting up listener
+    const checkCurrentSession = async () => {
+      try {
+        const { user: currentUser, error } = await authService.getCurrentUser()
+        if (currentUser && !error) {
+          setUser(currentUser)
+        }
+      } catch (error) {
+        console.error('Initial auth check error:', error)
+      }
+    }
+
+    checkCurrentSession()
+
     return () => subscription.unsubscribe()
-  }, [isClient, checkAuth])
+  }, [isClient])
 
   const login = async (credentials: LoginCredentials) => {
     try {
@@ -86,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return { success: false, error: 'Login failed' }
     } catch (error) {
-      console.error('Login error:', error)
+      console.error('AuthProvider: Login error:', error)
       return { success: false, error: 'An unexpected error occurred' }
     }
   }

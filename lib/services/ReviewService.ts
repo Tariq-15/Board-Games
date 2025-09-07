@@ -1,43 +1,116 @@
-import { ReviewController } from "@/Controller/ReviewController"
-import type { ReviewFilters, PaginatedReviews } from "@/Controller/ReviewController"
-import type { Review } from "@/Model/Review"
+import { ReviewModel, Review } from "@/Model/Review"
+
+export interface CreateReviewData {
+  game_id: string
+  user_id: string
+  rating: number
+  title: string
+  content: string
+  is_verified_purchase?: boolean
+  status?: string
+}
+
+export interface ReviewServiceResponse {
+  success: boolean
+  data?: Review
+  error?: string
+}
 
 export class ReviewService {
-  private reviewController: ReviewController
+  private reviewModel: ReviewModel
 
   constructor() {
-    this.reviewController = new ReviewController()
+    this.reviewModel = ReviewModel.getInstance()
   }
 
-  public async getGameReviews(gameId: string): Promise<Review[]> {
-    return await this.reviewController.getGameReviews(gameId)
+  async createReview(reviewData: CreateReviewData): Promise<ReviewServiceResponse> {
+    try {
+      console.log('Creating review:', reviewData)
+      
+      const review = await this.reviewModel.create(reviewData)
+      
+      console.log('Review created successfully:', review.id)
+      return { success: true, data: review }
+    } catch (error) {
+      console.error('Error creating review:', error)
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Failed to create review' 
+      }
+    }
   }
 
-  public async getAllReviews(filters: ReviewFilters = {}): Promise<PaginatedReviews> {
-    return await this.reviewController.getAllReviews(filters)
+  async getGameReviews(gameId: string): Promise<Review[]> {
+    try {
+      console.log('Getting reviews for game:', gameId)
+      const reviews = await this.reviewModel.findByGameId(gameId)
+      console.log('Found reviews:', reviews.length)
+      return reviews
+    } catch (error) {
+      console.error('Error fetching game reviews:', error)
+      return []
+    }
   }
 
-  public async getReviewById(id: string): Promise<Review | null> {
-    return await this.reviewController.getReviewById(id)
+  async getUserReviews(userId: string): Promise<Review[]> {
+    try {
+      console.log('Getting reviews for user:', userId)
+      const allReviews = await this.reviewModel.findAll()
+      const userReviews = allReviews.filter(review => review.user_id === userId)
+      console.log('Found user reviews:', userReviews.length)
+      return userReviews
+    } catch (error) {
+      console.error('Error fetching user reviews:', error)
+      return []
+    }
   }
 
-  public async createReview(reviewData: Omit<Review, "id" | "created_at" | "updated_at">): Promise<Review> {
-    return await this.reviewController.createReview(reviewData)
+  async updateReview(reviewId: string, updates: Partial<Review>): Promise<ReviewServiceResponse> {
+    try {
+      console.log('Updating review:', reviewId, updates)
+      
+      const review = await this.reviewModel.update(reviewId, updates)
+      
+      console.log('Review updated successfully:', review.id)
+      return { success: true, data: review }
+    } catch (error) {
+      console.error('Error updating review:', error)
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Failed to update review' 
+      }
+    }
   }
 
-  public async updateReview(id: string, reviewData: Partial<Review>): Promise<Review> {
-    return await this.reviewController.updateReview(id, reviewData)
+  async deleteReview(reviewId: string): Promise<ReviewServiceResponse> {
+    try {
+      console.log('Deleting review:', reviewId)
+      
+      const success = await this.reviewModel.delete(reviewId)
+      
+      if (success) {
+        console.log('Review deleted successfully:', reviewId)
+        return { success: true }
+      } else {
+        return { success: false, error: 'Failed to delete review' }
+      }
+    } catch (error) {
+      console.error('Error deleting review:', error)
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Failed to delete review' 
+      }
+    }
   }
 
-  public async deleteReview(id: string): Promise<boolean> {
-    return await this.reviewController.deleteReview(id)
-  }
-
-  public async approveReview(id: string): Promise<Review> {
-    return await this.reviewController.approveReview(id)
-  }
-
-  public async rejectReview(id: string): Promise<Review> {
-    return await this.reviewController.rejectReview(id)
+  async getReviewById(reviewId: string): Promise<Review | null> {
+    try {
+      console.log('Getting review by ID:', reviewId)
+      const review = await this.reviewModel.findById(reviewId)
+      return review
+    } catch (error) {
+      console.error('Error fetching review by ID:', error)
+      return null
+    }
   }
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,20 +11,14 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { useAuth } from "@/components/providers/auth-provider"
 import { Edit, Save, X, User, Mail, Calendar, MapPin, BookOpen, Star, Heart, Plus, MessageSquare, Trash2 } from "lucide-react"
+import { WishlistService } from "@/lib/services/WishlistService"
+import { WishlistItem } from "@/Model/Wishlist"
+import { ReviewService } from "@/lib/services/ReviewService"
+import { Review } from "@/Model/Review"
+import Link from "next/link"
 
-interface WishlistItem {
-  id: string
-  gameTitle: string
-  addedDate: string
-}
 
-interface Review {
-  id: string
-  gameTitle: string
-  rating: number
-  comment: string
-  reviewDate: string
-}
+// Using Review from Model/Review.ts
 
 export default function ProfilePage() {
   const { user, updateProfile } = useAuth()
@@ -36,29 +30,14 @@ export default function ProfilePage() {
   })
 
   // Wishlist state
-  const [wishlist, setWishlist] = useState<WishlistItem[]>([
-    { id: "1", gameTitle: "Azul", addedDate: "2024-01-15" },
-    { id: "2", gameTitle: "Pandemic", addedDate: "2024-01-10" }
-  ])
-  const [showAddWishlist, setShowAddWishlist] = useState(false)
-  const [newWishlistItem, setNewWishlistItem] = useState("")
+  const [wishlist, setWishlist] = useState<WishlistItem[]>([])
+  const [wishlistLoading, setWishlistLoading] = useState(true)
+  const wishlistService = new WishlistService()
 
   // Reviews state
-  const [reviews, setReviews] = useState<Review[]>([
-    { 
-      id: "1", 
-      gameTitle: "Wingspan", 
-      rating: 5, 
-      comment: "Amazing bird-themed strategy game with beautiful artwork!", 
-      reviewDate: "2024-01-12" 
-    }
-  ])
-  const [showAddReview, setShowAddReview] = useState(false)
-  const [newReview, setNewReview] = useState({
-    gameTitle: "",
-    rating: 5,
-    comment: ""
-  })
+  const [reviews, setReviews] = useState<Review[]>([])
+  const [reviewsLoading, setReviewsLoading] = useState(true)
+  const reviewService = new ReviewService()
 
   const handleSave = async () => {
     if (user) {
@@ -83,47 +62,65 @@ export default function ProfilePage() {
     setIsEditing(false)
   }
 
-  // Wishlist functions
-  const addToWishlist = () => {
-    console.log('addToWishlist called, newWishlistItem:', newWishlistItem)
-    if (newWishlistItem.trim()) {
-      const newItem: WishlistItem = {
-        id: Date.now().toString(),
-        gameTitle: newWishlistItem.trim(),
-        addedDate: new Date().toISOString().split('T')[0]
+  // Load wishlist and reviews on component mount
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (!user?.id) {
+        setWishlistLoading(false)
+        setReviewsLoading(false)
+        return
       }
-      console.log('Adding new item:', newItem)
-      setWishlist([...wishlist, newItem])
-      setNewWishlistItem("")
-      setShowAddWishlist(false)
-      console.log('Wishlist updated, new length:', wishlist.length + 1)
-    } else {
-      console.log('newWishlistItem is empty or only whitespace')
-    }
-  }
 
-  const removeFromWishlist = (id: string) => {
-    setWishlist(wishlist.filter(item => item.id !== id))
+      try {
+        // Load wishlist
+        const wishlistResult = await wishlistService.getUserWishlist(user.id)
+        if (wishlistResult.success && wishlistResult.data) {
+          setWishlist(wishlistResult.data)
+        }
+
+        // Load reviews
+        const userReviews = await reviewService.getUserReviews(user.id)
+        setReviews(userReviews)
+
+      } catch (error) {
+        console.error('Error loading user data:', error)
+      } finally {
+        setWishlistLoading(false)
+        setReviewsLoading(false)
+      }
+    }
+
+    loadUserData()
+  }, [user?.id])
+
+  // Wishlist functions
+  const removeFromWishlist = async (gameId: string) => {
+    if (!user?.id) return
+
+    try {
+      const result = await wishlistService.removeFromWishlist(user.id, gameId)
+      if (result.success) {
+        setWishlist(wishlist.filter(item => item.game_id !== gameId))
+      }
+    } catch (error) {
+      console.error('Error removing from wishlist:', error)
+    }
   }
 
   // Review functions
-  const addReview = () => {
-    if (newReview.gameTitle.trim() && newReview.comment.trim()) {
-      const review: Review = {
-        id: Date.now().toString(),
-        gameTitle: newReview.gameTitle.trim(),
-        rating: newReview.rating,
-        comment: newReview.comment.trim(),
-        reviewDate: new Date().toISOString().split('T')[0]
-      }
-      setReviews([...reviews, review])
-      setNewReview({ gameTitle: "", rating: 5, comment: "" })
-      setShowAddReview(false)
-    }
-  }
+  const deleteReview = async (reviewId: string) => {
+    if (!user?.id) return
 
-  const removeReview = (id: string) => {
-    setReviews(reviews.filter(review => review.id !== id))
+    try {
+      const result = await reviewService.deleteReview(reviewId)
+      if (result.success) {
+        setReviews(reviews.filter(review => review.id !== reviewId))
+      } else {
+        console.error('Failed to delete review:', result.error)
+      }
+    } catch (error) {
+      console.error('Error deleting review:', error)
+    }
   }
 
   const renderStars = (rating: number) => {
@@ -313,56 +310,52 @@ export default function ProfilePage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {showAddWishlist && (
-              <div className="flex gap-2 p-4 bg-muted rounded-lg">
-                <Input
-                  placeholder="Enter game title..."
-                  value={newWishlistItem}
-                  onChange={(e) => setNewWishlistItem(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && addToWishlist()}
-                />
-                <Button onClick={() => {
-                  console.log('Add button clicked')
-                  addToWishlist()
-                }} size="sm">
-                  Add
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => setShowAddWishlist(false)}
-                >
-                  Cancel
-                </Button>
+            {wishlistLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <p className="text-muted-foreground mt-2">Loading wishlist...</p>
               </div>
-            )}
-            
-            {/* Debug info */}
-            <div className="text-xs text-muted-foreground p-2 bg-blue-50 rounded">
-              Debug: showAddWishlist = {showAddWishlist.toString()}, 
-              newWishlistItem = "{newWishlistItem}", 
-              wishlist length = {wishlist.length}
-            </div>
-            
-            {wishlist.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Heart className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>Your wishlist is empty</p>
-                <p className="text-sm">Add games you'd like to play!</p>
+            ) : wishlist.length === 0 ? (
+              <div className="text-center py-8">
+                <Heart className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium mb-2">Your wishlist is empty</h3>
+                <p className="text-muted-foreground mb-4">Browse games and add them to your wishlist</p>
+                <Button asChild>
+                  <Link href="/games">Browse Games</Link>
+                </Button>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {wishlist.map((item) => (
                   <div key={item.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                    <div>
-                      <p className="font-medium">{item.gameTitle}</p>
-                      <p className="text-sm text-muted-foreground">Added: {item.addedDate}</p>
+                    <div className="flex items-center space-x-3">
+                      {item.game?.image_url && (
+                        <img 
+                          src={item.game.image_url} 
+                          alt={item.game.title}
+                          className="w-12 h-12 object-cover rounded"
+                        />
+                      )}
+                      <div>
+                        <Link href={`/games/${item.game_id}`}>
+                          <h4 className="font-medium hover:text-primary transition-colors">
+                            {item.game?.title || 'Unknown Game'}
+                          </h4>
+                        </Link>
+                        <p className="text-sm text-muted-foreground">
+                          {item.game?.category?.name && (
+                            <Badge variant="outline" className="mr-2">
+                              {item.game.category.name}
+                            </Badge>
+                          )}
+                          Added on {new Date(item.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => removeFromWishlist(item.id)}
-                      className="text-red-500 hover:text-red-700"
+                      onClick={() => removeFromWishlist(item.game_id)}
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -378,102 +371,61 @@ export default function ProfilePage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MessageSquare className="w-5 h-5 text-blue-500" />
-              My Reviews
+              My Reviews ({reviews.length})
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {showAddReview && (
-              <div className="p-4 bg-muted rounded-lg space-y-3">
-                <div>
-                  <Label htmlFor="gameTitle">Game Title</Label>
-                  <Input
-                    id="gameTitle"
-                    placeholder="Enter game title..."
-                    value={newReview.gameTitle}
-                    onChange={(e) => setNewReview({ ...newReview, gameTitle: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="rating">Rating</Label>
-                  <div className="flex items-center gap-2 mt-1">
-                    {renderStars(newReview.rating)}
-                    <span className="ml-2 text-sm text-muted-foreground">
-                      {newReview.rating}/5
-                    </span>
-                  </div>
-                  <div className="flex gap-1 mt-2">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <button
-                        key={star}
-                        onClick={() => setNewReview({ ...newReview, rating: star })}
-                        className="p-1 hover:bg-background rounded"
-                      >
-                        <Star
-                          className={`w-5 h-5 ${
-                            star <= newReview.rating 
-                              ? 'fill-yellow-400 text-yellow-400' 
-                              : 'text-gray-300'
-                          }`}
-                        />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="comment">Review</Label>
-                  <Textarea
-                    id="comment"
-                    placeholder="Share your thoughts about this game..."
-                    value={newReview.comment}
-                    onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })}
-                    rows={3}
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Button onClick={addReview} size="sm">
-                    Submit Review
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => setShowAddReview(false)}
-                  >
-                    Cancel
-                  </Button>
-                </div>
+            {reviewsLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <p className="text-muted-foreground mt-2">Loading reviews...</p>
               </div>
-            )}
-            
-            {reviews.length === 0 ? (
+            ) : reviews.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>No reviews yet</p>
-                <p className="text-sm">Share your thoughts about the games you've played!</p>
+                <h3 className="text-lg font-medium mb-2">No reviews yet</h3>
+                <p className="text-sm mb-4">Share your thoughts about the games you've played!</p>
+                <Button asChild>
+                  <Link href="/games">Browse Games</Link>
+                </Button>
               </div>
             ) : (
               <div className="space-y-4">
                 {reviews.map((review) => (
                   <div key={review.id} className="p-4 bg-muted rounded-lg">
                     <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h4 className="font-medium">{review.gameTitle}</h4>
-                        <div className="flex items-center gap-2 mt-1">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Link 
+                            href={`/games/${review.game_id}`}
+                            className="font-medium hover:text-primary transition-colors"
+                          >
+                            {review.game_title || 'Unknown Game'}
+                          </Link>
+                          {review.is_verified_purchase && (
+                            <Badge variant="outline" className="text-xs">
+                              Verified Purchase
+                            </Badge>
+                          )}
+                        </div>
+                        <h4 className="font-medium text-lg mb-1">{review.title}</h4>
+                        <div className="flex items-center gap-2 mb-2">
                           {renderStars(review.rating)}
                           <span className="text-sm text-muted-foreground">
-                            {review.reviewDate}
+                            {new Date(review.created_at).toLocaleDateString()}
                           </span>
                         </div>
                       </div>
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => removeReview(review.id)}
+                        onClick={() => deleteReview(review.id)}
                         className="text-red-500 hover:text-red-700"
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
-                    <p className="text-sm">{review.comment}</p>
+                    <p className="text-sm leading-relaxed">{review.content}</p>
                   </div>
                 ))}
               </div>

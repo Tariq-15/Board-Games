@@ -21,6 +21,10 @@ export class GameService {
     return await this.gameController.getGameById(id)
   }
 
+  public async getGameByIdForAdmin(id: string): Promise<Game | null> {
+    return await this.gameController.getGameByIdForAdmin(id)
+  }
+
   public async getAllGames(): Promise<Game[]> {
     return await this.gameController.getAllGames()
   }

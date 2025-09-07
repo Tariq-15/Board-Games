@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
 import { use } from "react"
+import { GameService } from "@/lib/services/GameService"
+import type { Game } from "@/Model/Game"
 
 export default function EditGamePage({
   params,
@@ -12,8 +14,9 @@ export default function EditGamePage({
   params: Promise<{ id: string }>
 }) {
   const router = useRouter()
-  const [game, setGame] = useState<any>(null)
+  const [game, setGame] = useState<Game | null>(null)
   const [loading, setLoading] = useState(true)
+  const [updating, setUpdating] = useState(false)
   
   // Unwrap the params Promise using React.use()
   const { id } = use(params)
@@ -22,35 +25,24 @@ export default function EditGamePage({
   useEffect(() => {
     const loadGame = async () => {
       console.log("Loading game with ID:", id)
+      setLoading(true) // Ensure loading state is set
+      
       try {
-        // For now, let's use a mock game to test the form
-        const mockGame = {
-          id: id,
-          title: "Test Game",
-          description: "This is a test game description",
-          short_description: "Test game short description",
-          publisher: "Test Publisher",
-          designer: "Test Designer",
-          year_published: 2024,
-          min_players: 2,
-          max_players: 4,
-          min_age: 8,
-          playing_time: 60,
-          complexity_rating: 3,
-          price: 29.99,
-          image_url: "/placeholder.jpg",
-          thumbnail_url: "/placeholder.jpg",
-          category_id: "strategy",
-          is_active: true,
-          created_at: "2024-01-01T00:00:00Z",
-          updated_at: "2024-01-01T00:00:00Z",
-          category_name: "Strategy",
-          average_rating: 4.0,
-          review_count: 5
+        const gameService = new GameService()
+        console.log("GameService created, calling getGameByIdForAdmin...")
+        
+        const gameData = await gameService.getGameByIdForAdmin(id)
+        console.log("Game data received:", gameData)
+        
+        if (!gameData) {
+          console.log("No game data found for ID:", id)
+          toast.error("Game not found")
+          router.push("/admin/games")
+          return
         }
         
-        console.log("Mock game data created:", mockGame)
-        setGame(mockGame)
+        console.log("Setting game data and stopping loading...")
+        setGame(gameData)
         setLoading(false)
       } catch (error) {
         console.error("Error loading game:", error)
@@ -58,17 +50,32 @@ export default function EditGamePage({
         setLoading(false)
       }
     }
-    loadGame()
-  }, [id])
+    
+    if (id) {
+      loadGame()
+    } else {
+      console.log("No ID provided, stopping loading")
+      setLoading(false)
+    }
+  }, [id]) // Removed router from dependencies to prevent infinite loop
 
-  const handleSubmit = async (gameData: any) => {
+  const handleSubmit = async (gameData: Partial<Game>) => {
+    if (!game) return
+    
+    setUpdating(true)
     try {
-      console.log("Form submitted with data:", gameData)
-      toast.success("Game updated successfully (mock)")
+      console.log("Updating game with data:", gameData)
+      
+      const gameService = new GameService()
+      await gameService.updateGame(game.id, gameData)
+      
+      toast.success("Game updated successfully!")
       router.push("/admin/games")
     } catch (error) {
       console.error("Error updating game:", error)
       toast.error("Failed to update game")
+    } finally {
+      setUpdating(false)
     }
   }
 
@@ -112,7 +119,7 @@ export default function EditGamePage({
           <p className="text-muted-foreground">Update game information and details</p>
         </div>
 
-        <GameForm game={game} onSubmit={handleSubmit} />
+        <GameForm game={game} onSubmit={handleSubmit} isUpdating={updating} />
       </div>
     </div>
   )

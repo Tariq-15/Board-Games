@@ -1,11 +1,10 @@
 import { Button } from "@/components/ui/button"
-import { Gamepad2, Users, Settings } from "lucide-react"
+import { Gamepad2, Users } from "lucide-react"
 import Link from "next/link"
 
 const navItems = [
   { name: "Games", href: "/admin/games", icon: Gamepad2 },
   { name: "Users", href: "/admin/users", icon: Users },
-  { name: "Settings", href: "/admin/settings", icon: Settings },
 ]
 
 export function AdminNavigation() {

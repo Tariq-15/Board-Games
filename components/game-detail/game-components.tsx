@@ -64,7 +64,7 @@ export function GameComponents({ game }: GameComponentsProps) {
               <Badge variant="secondary">
                 Age {game.min_age}+
               </Badge>
-              {game.average_rating && (
+              {game.average_rating !== undefined && game.average_rating > 0 && (
                 <Badge variant="outline">
                   ⭐ {game.average_rating.toFixed(1)}
                 </Badge>

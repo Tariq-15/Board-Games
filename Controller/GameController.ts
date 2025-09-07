@@ -62,6 +62,10 @@ export class GameController {
     return await this.gameModel.findById(id)
   }
 
+  public async getGameByIdForAdmin(id: string): Promise<Game | null> {
+    return await this.gameModel.findByIdForAdmin(id)
+  }
+
   public async getAllGames(): Promise<Game[]> {
     return await this.gameModel.findAll()
   }

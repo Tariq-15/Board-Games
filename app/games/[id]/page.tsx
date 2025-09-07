@@ -32,7 +32,7 @@ export default async function GameDetailPage({
         </div>
 
         <div className="lg:col-span-1">
-          <GameReviews gameId={game.id} />
+          <GameReviews gameId={game.id} gameTitle={game.title} />
         </div>
       </div>
 

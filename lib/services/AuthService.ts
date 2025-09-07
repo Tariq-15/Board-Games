@@ -126,20 +126,34 @@ export class AuthService {
         return { user: null, error: 'Registration failed' }
       }
 
-      // Create user profile
-      const { error: profileError } = await supabase
+      // Check if profile already exists
+      const { data: existingProfile, error: checkError } = await supabase
         .from('profiles')
-        .insert([{
-          id: data.user.id,
-          email: credentials.email,
-          full_name: credentials.fullName,
-          avatar_url: '/placeholder-user.jpg',
-          bio: ''
-        }])
+        .select('id')
+        .eq('id', data.user.id)
+        .single()
 
-      if (profileError) {
-        console.error('Error creating profile:', profileError)
-        return { user: null, error: 'Profile creation failed' }
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('Error checking existing profile:', checkError)
+        return { user: null, error: 'Profile check failed' }
+      }
+
+      // Create user profile only if it doesn't exist
+      if (!existingProfile) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert([{
+            id: data.user.id,
+            email: credentials.email,
+            full_name: credentials.fullName,
+            avatar_url: '/placeholder-user.jpg',
+            bio: ''
+          }])
+
+        if (profileError) {
+          console.error('Error creating profile:', profileError)
+          return { user: null, error: `Profile creation failed: ${profileError.message}` }
+        }
       }
 
       const user: User = {
